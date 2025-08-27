@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "NaturalSystems (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "NaturalSystems (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
