@@ -8,19 +8,20 @@ namespace NaturalSystems.Games.RandomWalker;
 
 public sealed partial class RandomWalkerGame : IGame
 {
-    private static readonly Size DefaultCanvasPixelSize = new(2, 2); // Each canvas pixel is 20x20 DIPs.
-    private static readonly Size DefaultCanvasGridSize = new(100, 100); // The canvas is 20x20 canvas pixels.
-    private static readonly Size DefaultWalkerSize = new(10, 10); // The walker is 1x1 canvas pixels.
+    private static readonly Size DefaultCanvasPixelSize = new(20, 20); // Each canvas pixel is 20x20 DIPs.
+    private static readonly Size DefaultCanvasGridSize = new(50, 50); // The canvas is 20x20 canvas pixels.
+    private static readonly Size DefaultWalkerSize = new(1, 1); // The walker is 1x1 canvas pixels.
     private static readonly Point DefaultWalkerPosition = Point.Empty;
     private static readonly Color DefaultCanvasBackgroundColor = Color.White;
     private static readonly Color DefaultWalkerBackgroundColor = Color.Red;
     private static readonly TimeSpan UpdateInterval = TimeSpan.FromMilliseconds(50); // one move every 200ms
-    private static readonly int StepSize = 2;
+    private static readonly int StepSize = 1;
 
     private readonly Size CanvasSize;
     private readonly Color CanvasBackgroundColor;
     private readonly Walker RandomWalker;
-    private readonly List<MoveOperation> Moves;
+    private readonly List<MoveOperation> Moves = [];
+    private readonly HashSet<IDrawable> _priorWalkers = [];
 
     private TimeSpan _timeSinceLastUpdate = TimeSpan.Zero;
 
@@ -31,7 +32,6 @@ public sealed partial class RandomWalkerGame : IGame
         CanvasSize = DefaultCanvasGridSize;
         CanvasBackgroundColor = DefaultCanvasBackgroundColor;
         RandomWalker = new(DefaultWalkerSize, DefaultWalkerPosition, DefaultWalkerBackgroundColor);
-        Moves = [];
     }
 
     public void UpdateState(GameUpdateContext context)
@@ -52,7 +52,7 @@ public sealed partial class RandomWalkerGame : IGame
             if (!HasNextMove)
             {
                 //AddRandomMoveOperations();
-                AddCoinFlipMoveOperation();
+                AddRandom8WayMoveOperation();
             }
         }
 
@@ -76,7 +76,7 @@ public sealed partial class RandomWalkerGame : IGame
         return true;
     }
 
-    private void AddCoinFlipMoveOperation()
+    private void Add4WayCoinFlipMoveOperation()
     {
         Random random = new();
         int flip1 = random.Next(0, 2);
@@ -89,6 +89,13 @@ public sealed partial class RandomWalkerGame : IGame
         Moves.Add(new(direction, 1));
 
         static bool isHeads(int c) => c == 0;
+    }
+
+    private void AddRandom8WayMoveOperation()
+    {
+        Random random = new();
+        MoveDirection direction = (MoveDirection)random.Next(0, Enum.GetNames(typeof(MoveDirection)).Length);
+        Moves.Add(new(direction, 1));
     }
 
     private void AddRandomMoveOperations()
@@ -151,6 +158,10 @@ public sealed partial class RandomWalkerGame : IGame
             MoveDirection.Right => new Point(oldPosition.X + steps, oldPosition.Y),
             MoveDirection.Forward => new Point(oldPosition.X, oldPosition.Y - steps),
             MoveDirection.Backward => new Point(oldPosition.X, oldPosition.Y + steps),
+            MoveDirection.ForwardLeft => new Point(oldPosition.X - steps, oldPosition.Y - steps),
+            MoveDirection.ForwardRight => new Point(oldPosition.X + steps, oldPosition.Y - steps),
+            MoveDirection.BackwardLeft => new Point(oldPosition.X - steps, oldPosition.Y + steps),
+            MoveDirection.BackwardRight => new Point(oldPosition.X + steps, oldPosition.Y + steps),
             _ => oldPosition
         };
 
@@ -167,7 +178,41 @@ public sealed partial class RandomWalkerGame : IGame
         Size walkerDimensions = new(RandomWalker.Dimensions.Width * DefaultCanvasPixelSize.Width, RandomWalker.Dimensions.Height * DefaultCanvasPixelSize.Height);
 
         RectangleDrawable gameBorder = new(new(Point.Empty, canvasDimensions), CanvasBackgroundColor);
-        RectangleDrawable drawable = new(new(walkerPosition, walkerDimensions), RandomWalker.Color);
-        return new GameFrame([gameBorder, drawable]);
+        RectangleDrawable walker = new(new(walkerPosition, walkerDimensions), RandomWalker.Color);
+        GameFrame nextFrame = new([gameBorder, .. _priorWalkers, walker]);
+
+        // Save a differently colored rect.
+        walker.Color = RandomVibrantColor(new());
+        _priorWalkers.Add(walker);
+
+        return nextFrame;
+    }
+
+    public static Color RandomVibrantColor(Random random)
+    {
+        double hue = random.NextDouble() * 360.0;
+        return FromHsv(hue, 0.8, 0.9); // high saturation, high brightness
+    }
+
+    private static Color FromHsv(double hue, double saturation, double value)
+    {
+        int hi = (int)(hue / 60) % 6;
+        double f = hue / 60 - Math.Floor(hue / 60);
+
+        value *= 255;
+        byte v = (byte)value;
+        byte p = (byte)(value * (1 - saturation));
+        byte q = (byte)(value * (1 - f * saturation));
+        byte t = (byte)(value * (1 - (1 - f) * saturation));
+
+        return hi switch
+        {
+            0 => Color.FromArgb(255, v, t, p),
+            1 => Color.FromArgb(255, q, v, p),
+            2 => Color.FromArgb(255, p, v, t),
+            3 => Color.FromArgb(255, p, q, v),
+            4 => Color.FromArgb(255, t, p, v),
+            _ => Color.FromArgb(255, v, p, q),
+        };
     }
 }

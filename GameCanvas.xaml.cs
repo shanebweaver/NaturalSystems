@@ -12,7 +12,9 @@ namespace NaturalSystems;
 
 public sealed partial class GameCanvas : UserControl
 {
-    private readonly HashSet<VirtualKey> _keysDown = [];
+    private readonly HashSet<VirtualKey> _keysDown = new();
+    private readonly HashSet<VirtualKey> _keysPressedThisFrame = new();
+    private readonly HashSet<VirtualKey> _keysReleasedThisFrame = new();
 
     public IGame? Game { get; set; }
 
@@ -36,12 +38,18 @@ public sealed partial class GameCanvas : UserControl
 
     private void OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        _keysDown.Add(e.Key);
+        if (_keysDown.Add(e.Key))
+        {
+            _keysPressedThisFrame.Add(e.Key);
+        }
     }
 
     private void OnKeyUp(object sender, KeyRoutedEventArgs e)
     {
-        _keysDown.Remove(e.Key);
+        if (_keysDown.Remove(e.Key))
+        {
+            _keysReleasedThisFrame.Add(e.Key);
+        }
     }
 
     private void StartGameLoop()
@@ -89,21 +97,18 @@ public sealed partial class GameCanvas : UserControl
         {
             TimeSpan deltaTime = args.Timing.ElapsedTime;
 
-            var buttons = InputButtons.None;
-
+            InputButtons buttons = InputButtons.None;
             if (_keysDown.Contains(VirtualKey.Up)) buttons |= InputButtons.Up;
             if (_keysDown.Contains(VirtualKey.Down)) buttons |= InputButtons.Down;
             if (_keysDown.Contains(VirtualKey.Left)) buttons |= InputButtons.Left;
             if (_keysDown.Contains(VirtualKey.Right)) buttons |= InputButtons.Right;
 
-            var input = new InputState
-            {
-                Buttons = buttons,
-                Keys = [.. _keysDown]
-            };
-
+            var input = new InputState(_keysDown, _keysPressedThisFrame, _keysReleasedThisFrame, buttons);
             var context = new GameUpdateContext(deltaTime, input);
             Game.UpdateState(context);
+
+            _keysPressedThisFrame.Clear();
+            _keysReleasedThisFrame.Clear();
         }
     }
 }
