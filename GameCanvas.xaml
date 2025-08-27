@@ -6,9 +6,7 @@
     xmlns:canvas="using:Microsoft.Graphics.Canvas.UI.Xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    IsTabStop="True"
     mc:Ignorable="d">
-
-    <Grid>
-        <canvas:CanvasAnimatedControl x:Name="CanvasControl" />
-    </Grid>
+    <canvas:CanvasAnimatedControl x:Name="CanvasControl" />
 </UserControl>

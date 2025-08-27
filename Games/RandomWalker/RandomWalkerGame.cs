@@ -8,20 +8,21 @@ namespace NaturalSystems.Games.RandomWalker;
 
 public sealed partial class RandomWalkerGame : IGame
 {
-    private static readonly Size DefaultCanvasPixelSize = new(20, 20); // Each canvas pixel is 20x20 DIPs.
-    private static readonly Size DefaultCanvasGridSize = new(20, 20); // The canvas is 20x20 canvas pixels.
-    private static readonly Size DefaultWalkerSize = new(1, 1); // The walker is 1x1 canvas pixels.
+    private static readonly Size DefaultCanvasPixelSize = new(2, 2); // Each canvas pixel is 20x20 DIPs.
+    private static readonly Size DefaultCanvasGridSize = new(100, 100); // The canvas is 20x20 canvas pixels.
+    private static readonly Size DefaultWalkerSize = new(10, 10); // The walker is 1x1 canvas pixels.
     private static readonly Point DefaultWalkerPosition = Point.Empty;
     private static readonly Color DefaultCanvasBackgroundColor = Color.White;
     private static readonly Color DefaultWalkerBackgroundColor = Color.Red;
-    private static readonly TimeSpan MoveInterval = TimeSpan.FromMilliseconds(50); // one move every 200ms
+    private static readonly TimeSpan UpdateInterval = TimeSpan.FromMilliseconds(50); // one move every 200ms
+    private static readonly int StepSize = 2;
 
     private readonly Size CanvasSize;
     private readonly Color CanvasBackgroundColor;
     private readonly Walker RandomWalker;
     private readonly List<MoveOperation> Moves;
 
-    private TimeSpan _timeSinceLastMove = TimeSpan.Zero;
+    private TimeSpan _timeSinceLastUpdate = TimeSpan.Zero;
 
     private bool HasNextMove => Moves.Count > 0;
 
@@ -33,34 +34,46 @@ public sealed partial class RandomWalkerGame : IGame
         Moves = [];
     }
 
-    public void UpdateState(TimeSpan deltaTime)
+    public void UpdateState(GameUpdateContext context)
     {
-        _timeSinceLastMove += deltaTime;
-        if (_timeSinceLastMove < MoveInterval)
+        _timeSinceLastUpdate += context.DeltaTime;
+        if (_timeSinceLastUpdate > UpdateInterval)
         {
-            return;
+            var input = context.Input;
+            if (input.IsPressed(InputButtons.Left))
+                Moves.Add(new(MoveDirection.Left, 1));
+            if (input.IsPressed(InputButtons.Right))
+                Moves.Add(new(MoveDirection.Right, 1));
+            if (input.IsPressed(InputButtons.Up))
+                Moves.Add(new(MoveDirection.Forward, 1));
+            if (input.IsPressed(InputButtons.Down))
+                Moves.Add(new(MoveDirection.Backward, 1));
+
+            if (!HasNextMove)
+            {
+                //AddRandomMoveOperations();
+                AddCoinFlipMoveOperation();
+            }
         }
 
-        _timeSinceLastMove = TimeSpan.Zero;
-
-        if (!HasNextMove)
+        bool moved = TryProcessNextMove();
+        if (moved)
         {
-            AddRandomMoveOperations();
-            AddCoinFlipMoveOperation();
+            _timeSinceLastUpdate = TimeSpan.Zero;
         }
-
-        ProcessNextMove();
     }
 
-    private void ProcessNextMove()
+    private bool TryProcessNextMove()
     {
         if (Moves.Count == 0)
         {
-            return;
+            return false;
         }
 
         MoveWalker(Moves.First());
         Moves.RemoveAt(0);
+
+        return true;
     }
 
     private void AddCoinFlipMoveOperation()
@@ -108,9 +121,9 @@ public sealed partial class RandomWalkerGame : IGame
         int maxMoves = direction switch
         {
             MoveDirection.Left => RandomWalker.Position.X,
-            MoveDirection.Right => (CanvasSize.Width - 1) - RandomWalker.Position.X,
+            MoveDirection.Right => (CanvasSize.Width - RandomWalker.Dimensions.Width) - RandomWalker.Position.X,
             MoveDirection.Forward => RandomWalker.Position.Y,
-            MoveDirection.Backward => (CanvasSize.Height - 1) - RandomWalker.Position.Y,
+            MoveDirection.Backward => (CanvasSize.Height - RandomWalker.Dimensions.Height) - RandomWalker.Position.Y,
             _ => 0
         };
 
@@ -128,8 +141,9 @@ public sealed partial class RandomWalkerGame : IGame
         MoveWalker(moveOperation.Direction, moveOperation.Distance);
     }
     
-    private void MoveWalker(MoveDirection direction, int steps)
+    private void MoveWalker(MoveDirection direction, int distance)
     {
+        int steps = distance * StepSize;
         Point oldPosition = RandomWalker.Position;
         Point newPosition = direction switch
         {
@@ -140,8 +154,8 @@ public sealed partial class RandomWalkerGame : IGame
             _ => oldPosition
         };
 
-        int clampedX = Math.Clamp(newPosition.X, 0, CanvasSize.Width - 1);
-        int clampedY = Math.Clamp(newPosition.Y, 0, CanvasSize.Height - 1);
+        int clampedX = Math.Clamp(newPosition.X, 0, CanvasSize.Width - RandomWalker.Dimensions.Width);
+        int clampedY = Math.Clamp(newPosition.Y, 0, CanvasSize.Height - RandomWalker.Dimensions.Height);
         RandomWalker.Position = new Point(clampedX, clampedY);
     }
 

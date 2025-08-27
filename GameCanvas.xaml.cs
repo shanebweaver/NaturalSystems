@@ -1,13 +1,19 @@
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using NaturalSystems.GameEngine;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using Windows.System;
 
 namespace NaturalSystems;
 
 public sealed partial class GameCanvas : UserControl
 {
+    private readonly HashSet<VirtualKey> _keysDown = [];
+
     public IGame? Game { get; set; }
 
     public GameCanvas()
@@ -19,33 +25,43 @@ public sealed partial class GameCanvas : UserControl
 
     private void OnCanvasControlLoaded(object sender, RoutedEventArgs e)
     {
-        Debug.WriteLine("OnLoaded");
-
-        CanvasControl.GameLoopStarting += OnGameLoopStarting;
-        CanvasControl.GameLoopStopped += OnGameLoopStopped;
+        CanvasControl.Focus(FocusState.Programmatic);
         StartGameLoop();
     }
 
     private void OnCanvasControlUnloaded(object sender, RoutedEventArgs e)
     {
-        Debug.WriteLine("OnUnloaded");
         StopGameLoop();
-        CanvasControl.GameLoopStarting -= OnGameLoopStarting;
-        CanvasControl.GameLoopStopped -= OnGameLoopStopped;
+    }
+
+    private void OnKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        _keysDown.Add(e.Key);
+    }
+
+    private void OnKeyUp(object sender, KeyRoutedEventArgs e)
+    {
+        _keysDown.Remove(e.Key);
     }
 
     private void StartGameLoop()
     {
-        Debug.WriteLine("StartGameLoop");
+        KeyDown += OnKeyDown;
+        KeyUp += OnKeyUp;
+        CanvasControl.GameLoopStarting += OnGameLoopStarting;
+        CanvasControl.GameLoopStopped += OnGameLoopStopped;
         CanvasControl.Draw += OnDraw;
         CanvasControl.Update += OnUpdate;
     }
 
     private void StopGameLoop()
     {
-        Debug.WriteLine("StopGameLoop");
         CanvasControl.Draw -= OnDraw;
         CanvasControl.Update -= OnUpdate;
+        CanvasControl.GameLoopStarting -= OnGameLoopStarting;
+        CanvasControl.GameLoopStopped -= OnGameLoopStopped;
+        KeyDown -= OnKeyDown;
+        KeyUp -= OnKeyUp;
     }
 
     private void OnGameLoopStopped(ICanvasAnimatedControl sender, object args)
@@ -60,7 +76,6 @@ public sealed partial class GameCanvas : UserControl
 
     private void OnDraw(ICanvasAnimatedControl sender, CanvasAnimatedDrawEventArgs args)
     {
-        Debug.WriteLine("OnDraw");
         if (Game != null)
         {
             GameFrame gameFrame = Game.GetNextGameFrame();
@@ -70,11 +85,25 @@ public sealed partial class GameCanvas : UserControl
 
     private void OnUpdate(ICanvasAnimatedControl sender, CanvasAnimatedUpdateEventArgs args)
     {
-        Debug.WriteLine("OnUpdate");
-
         if (Game != null)
         {
-            Game.UpdateState(args.Timing.ElapsedTime);
+            TimeSpan deltaTime = args.Timing.ElapsedTime;
+
+            var buttons = InputButtons.None;
+
+            if (_keysDown.Contains(VirtualKey.Up)) buttons |= InputButtons.Up;
+            if (_keysDown.Contains(VirtualKey.Down)) buttons |= InputButtons.Down;
+            if (_keysDown.Contains(VirtualKey.Left)) buttons |= InputButtons.Left;
+            if (_keysDown.Contains(VirtualKey.Right)) buttons |= InputButtons.Right;
+
+            var input = new InputState
+            {
+                Buttons = buttons,
+                Keys = [.. _keysDown]
+            };
+
+            var context = new GameUpdateContext(deltaTime, input);
+            Game.UpdateState(context);
         }
     }
 }

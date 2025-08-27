@@ -1,5 +1,4 @@
 using NaturalSystems.GameEngine;
-using System;
 using System.Collections.Generic;
 using System.Drawing;
 
@@ -12,7 +11,7 @@ public sealed partial class TestGame : IGame
 
     private Rectangle _gameRect = new(DefaultPosition, DefaultSize);
 
-    public void UpdateState(TimeSpan deltaTime)
+    public void UpdateState(GameUpdateContext context)
     {
         _gameRect.Offset(1,0);
     }

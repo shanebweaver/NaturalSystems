@@ -1,10 +1,8 @@
-using System;
-
 namespace NaturalSystems.GameEngine;
 
 public interface IGame
 {
-    void UpdateState(TimeSpan deltaTime);
+    void UpdateState(GameUpdateContext context);
 
     GameFrame GetNextGameFrame();
 }
